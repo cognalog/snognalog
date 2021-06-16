@@ -86,7 +86,6 @@ def dist_to_closest_food(head, board):
         closest_dist = min(closest_dist, point_distance(food, head))
     return 0 if closest_dist == default else closest_dist * -1
 
-
 def centrality(head, board):
     center_x = board["width"] / 2
     center_y = board["height"] / 2
@@ -120,7 +119,7 @@ class Battlesnake(object):
         return {
             "apiversion": "1",
             "author": "cognalog",  # TODO: Your Battlesnake Username
-            "color": "#0f8d94",  # TODO: Personalize
+            "color": "#6b0c78",  # TODO: Personalize
             "head": "safe",  # TODO: Personalize
             "tail": "freckled",  # TODO: Personalize
         }
