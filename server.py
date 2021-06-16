@@ -1,12 +1,113 @@
 import os
 import random
+import math
 
 import cherrypy
-
 """
 This is a simple Battlesnake server written in Python.
 For instructions see https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
+
+move_map = {
+    "up": {
+        "x": 0,
+        "y": 1
+    },
+    "down": {
+        "x": 0,
+        "y": -1
+    },
+    "left": {
+        "x": -1,
+        "y": 0
+    },
+    "right": {
+        "x": 1,
+        "y": 0
+    }
+}
+
+
+def is_blocked(x, y, data):
+    board = data["board"]
+    if (x < 0 or y < 0):
+        return True
+    if (x >= board["width"] or y >= board["height"]):
+        return True
+    for snake in board["snakes"]:
+        for part in snake["body"]:
+            if part["x"] == x and part["y"] == y:
+                return True
+    return False
+
+
+def get_cautious_moves(head_x, head_y, data):
+    possible_moves = ["up", "down", "left", "right"]
+    if is_blocked(head_x - 1, head_y, data) or is_blocked(
+            head_x - 2, head_y, data):
+        possible_moves.remove("left")
+    if is_blocked(head_x + 1, head_y, data) or is_blocked(
+            head_x + 2, head_y, data):
+        possible_moves.remove("right")
+    if is_blocked(head_x, head_y - 1, data) or is_blocked(
+            head_x, head_y - 2, data):
+        possible_moves.remove("down")
+    if is_blocked(head_x, head_y + 1, data) or is_blocked(
+            head_x, head_y + 2, data):
+        possible_moves.remove("up")
+
+    return possible_moves
+
+
+def get_normal_moves(head_x, head_y, data):
+    possible_moves = ["up", "down", "left", "right"]
+    if is_blocked(head_x - 1, head_y, data):
+        possible_moves.remove("left")
+    if is_blocked(head_x + 1, head_y, data):
+        possible_moves.remove("right")
+    if is_blocked(head_x, head_y - 1, data):
+        possible_moves.remove("down")
+    if is_blocked(head_x, head_y + 1, data):
+        possible_moves.remove("up")
+
+    return possible_moves
+
+
+def point_distance(p1, p2):
+    print(f"getting dist between {p1} and {p2}")
+    return math.sqrt((p1["x"] - p2["x"])**2 + (p1["y"] - p2["y"])**2)
+
+
+# score fn: distance to closest food
+def dist_to_closest_food(head, board):
+    default = 10000
+    closest_dist = default  # larger than anything realistic
+    for food in board["food"]:
+        closest_dist = min(closest_dist, point_distance(food, head))
+    return 0 if closest_dist == default else closest_dist * -1
+
+
+def centrality(head, board):
+    center_x = board["width"] / 2
+    center_y = board["height"] / 2
+    return (abs(head["x"] - center_x) + abs(head["y"] - center_y)) * -1
+
+
+def move_value(move_str, data):
+    move = move_map[move_str]
+    curr_head = data["you"]["head"]
+    next_head = {
+        key: (curr_head[key] + value)
+        for (key, value) in move.items()
+    }
+    # use any value fns available. This should amount to something like a linear expression
+    board = data["board"]
+    missing_health = 100 - data["you"]["health"]
+    value = (0.1 * missing_health * dist_to_closest_food(
+        next_head, board)) + centrality(next_head, board)
+    print(f"value of move '{move_str}': {value}")
+
+    return value
 
 
 class Battlesnake(object):
@@ -18,10 +119,10 @@ class Battlesnake(object):
         # TIP: If you open your Battlesnake URL in browser you should see this data
         return {
             "apiversion": "1",
-            "author": "",  # TODO: Your Battlesnake Username
-            "color": "#888888",  # TODO: Personalize
-            "head": "default",  # TODO: Personalize
-            "tail": "default",  # TODO: Personalize
+            "author": "cognalog",  # TODO: Your Battlesnake Username
+            "color": "#0f8d94",  # TODO: Personalize
+            "head": "safe",  # TODO: Personalize
+            "tail": "freckled",  # TODO: Personalize
         }
 
     @cherrypy.expose
@@ -43,9 +144,16 @@ class Battlesnake(object):
         # TODO: Use the information in cherrypy.request.json to decide your next move.
         data = cherrypy.request.json
 
-        # Choose a random direction to move in
-        possible_moves = ["up", "down", "left", "right"]
-        move = random.choice(possible_moves)
+        head_x = data["you"]["head"]["x"]
+        head_y = data["you"]["head"]["y"]
+
+        # filter out dangerous moves
+        moves = get_cautious_moves(head_x, head_y, data)
+        if not moves:
+            moves = get_normal_moves(head_x, head_y, data)
+
+        # Choose the best direction to move in
+        move = max(moves, key=lambda move: move_value(move, data))
 
         print(f"MOVE: {move}")
         return {"move": move}
@@ -64,8 +172,9 @@ class Battlesnake(object):
 if __name__ == "__main__":
     server = Battlesnake()
     cherrypy.config.update({"server.socket_host": "0.0.0.0"})
-    cherrypy.config.update(
-        {"server.socket_port": int(os.environ.get("PORT", "8080")),}
-    )
+    cherrypy.config.update({
+        "server.socket_port":
+        int(os.environ.get("PORT", "8080")),
+    })
     print("Starting Battlesnake Server...")
     cherrypy.quickstart(server)
