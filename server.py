@@ -8,6 +8,8 @@ This is a simple Battlesnake server written in Python.
 For instructions see https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
 
+lookahead = 3
+
 move_map = {
     "up": {
         "x": 0,
@@ -43,44 +45,40 @@ def is_blocked(x, y, data):
     return False
 
 
-def get_cautious_moves(curr_head, data):
+def head_to_head_liability(x, y, data):
+    point = {"x": x, "y": y}
+    you = data["you"]
+    for snake in data["board"]["snakes"]:
+        if (snake["id"] != you["id"]) and (point_distance(
+                point, snake["head"]) == 1) and len(snake["body"]) >= len(
+                    you["body"]):
+            return True
+    return False
+
+
+def is_safe(x, y, data):
+    return not is_blocked(x, y, data) and not head_to_head_liability(
+        x, y, data)
+
+
+def get_safe_moves(curr_head, data):
     head_x = curr_head["x"]
     head_y = curr_head["y"]
     moves = []
-    if not is_blocked(head_x - 1, head_y, data) and not is_blocked(
-            head_x - 2, head_y, data):
+    if is_safe(head_x - 1, head_y, data):
         moves.append("left")
-    if not is_blocked(head_x + 1, head_y, data) and not is_blocked(
-            head_x + 2, head_y, data):
+    if is_safe(head_x + 1, head_y, data):
         moves.append("right")
-    if not is_blocked(head_x, head_y - 1, data) and not is_blocked(
-            head_x, head_y - 2, data):
+    if is_safe(head_x, head_y - 1, data):
         moves.append("down")
-    if not is_blocked(head_x, head_y + 1, data) and not is_blocked(
-            head_x, head_y + 2, data):
-        moves.append("up")
-
-    return moves
-
-
-def get_normal_moves(curr_head, data):
-    head_x = curr_head["x"]
-    head_y = curr_head["y"]
-    moves = []
-    if not is_blocked(head_x - 1, head_y, data):
-        moves.append("left")
-    if not is_blocked(head_x + 1, head_y, data):
-        moves.append("right")
-    if not is_blocked(head_x, head_y - 1, data):
-        moves.append("down")
-    if not is_blocked(head_x, head_y + 1, data):
+    if is_safe(head_x, head_y + 1, data):
         moves.append("up")
 
     return moves
 
 
 def point_distance(p1, p2):
-    return math.sqrt((p1["x"] - p2["x"])**2 + (p1["y"] - p2["y"])**2)
+    return abs(p1["x"] - p2["x"]) + abs(p1["y"] - p2["y"])
 
 
 # score fn: distance to closest food
@@ -114,8 +112,8 @@ def board_value(curr_head, data):
     # use any value fns available. This should amount to something like a linear expression
     board = data["board"]
     missing_health = 100 - data["you"]["health"]
-    value = (0.1 * missing_health *
-             dist_to_closest_food(curr_head, board)) + centrality(
+    value = (missing_health *
+             dist_to_closest_food(curr_head, board)) + 5 * centrality(
                  curr_head, board) + 3 * dist_to_closest_head(curr_head, data)
 
     return value
@@ -134,7 +132,7 @@ def board_value_lookahead(curr_head, data, lookahead=0):
     if lookahead == 0:
         return board_value(curr_head, data)
 
-    moves = get_normal_moves(curr_head, data)
+    moves = get_safe_moves(curr_head, data)
     return -10000 if not moves else sum({
         board_value_lookahead(apply_move(move, curr_head), data, lookahead - 1)
         for move in moves
@@ -143,10 +141,11 @@ def board_value_lookahead(curr_head, data, lookahead=0):
 
 def choose_move(data):
     curr_head = data["you"]["head"]
-    moves = get_normal_moves(curr_head, data)
-    return "up" if not moves else max(moves,
-               key=lambda move: board_value_lookahead(
-                   apply_move(move, curr_head), data, 2))
+    moves = get_safe_moves(curr_head, data)
+    return "up" if not moves else max(
+        moves,
+        key=lambda move: board_value_lookahead(apply_move(move, curr_head),
+                                               data, lookahead))
 
 
 class Battlesnake(object):
