@@ -92,6 +92,18 @@ def dist_to_closest_food(head, board):
     return 0 if closest_dist == default else closest_dist * -1
 
 
+# score fn: distance to closest food
+def dist_to_closest_head(head, data):
+    default = 10000
+    closest_dist = default  # larger than anything realistic
+    you = data["you"]
+    for snake in data["board"]["snakes"]:
+        if (snake["id"] != you["id"]):
+            closest_dist = min(closest_dist,
+                               point_distance(snake["head"], head))
+    return 0 if closest_dist == default else closest_dist * 1
+
+
 def centrality(head, board):
     center_x = board["width"] / 2
     center_y = board["height"] / 2
@@ -102,8 +114,9 @@ def board_value(curr_head, data):
     # use any value fns available. This should amount to something like a linear expression
     board = data["board"]
     missing_health = 100 - data["you"]["health"]
-    value = (0.1 * missing_health * dist_to_closest_food(
-        curr_head, board)) + centrality(curr_head, board)
+    value = (0.1 * missing_health *
+             dist_to_closest_food(curr_head, board)) + centrality(
+                 curr_head, board) + 3 * dist_to_closest_head(curr_head, data)
 
     return value
 
@@ -122,7 +135,7 @@ def board_value_lookahead(curr_head, data, lookahead=0):
         return board_value(curr_head, data)
 
     moves = get_normal_moves(curr_head, data)
-    return -10000 if not moves else max({
+    return -10000 if not moves else sum({
         board_value_lookahead(apply_move(move, curr_head), data, lookahead - 1)
         for move in moves
     })
@@ -131,9 +144,9 @@ def board_value_lookahead(curr_head, data, lookahead=0):
 def choose_move(data):
     curr_head = data["you"]["head"]
     moves = get_normal_moves(curr_head, data)
-    return max(moves,
+    return "up" if not moves else max(moves,
                key=lambda move: board_value_lookahead(
-                   apply_move(move, curr_head), data, 1))
+                   apply_move(move, curr_head), data, 2))
 
 
 class Battlesnake(object):
@@ -173,7 +186,7 @@ class Battlesnake(object):
         # Choose the best direction to move in
         move = choose_move(data)
 
-        print(f"MOVE: {move}")
+        # print(f"MOVE: {move}")
         return {"move": move}
 
     @cherrypy.expose
