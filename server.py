@@ -98,15 +98,6 @@ def centrality(head, board):
     return (abs(head["x"] - center_x) + abs(head["y"] - center_y)) * -1
 
 
-def apply_move(move_str, curr_head):
-    move = move_map[move_str]
-    next_head = {
-        key: (curr_head[key] + value)
-        for (key, value) in move.items()
-    }
-    return next_head
-
-
 def board_value(curr_head, data):
     # use any value fns available. This should amount to something like a linear expression
     board = data["board"]
@@ -117,12 +108,21 @@ def board_value(curr_head, data):
     return value
 
 
+def apply_move(move_str, curr_head):
+    move = move_map[move_str]
+    next_head = {
+        key: (curr_head[key] + value)
+        for (key, value) in move.items()
+    }
+    return next_head
+
+
 def board_value_lookahead(curr_head, data, lookahead=0):
     if lookahead == 0:
         return board_value(curr_head, data)
 
     moves = get_normal_moves(curr_head, data)
-    return max({
+    return -10000 if not moves else max({
         board_value_lookahead(apply_move(move, curr_head), data, lookahead - 1)
         for move in moves
     })
