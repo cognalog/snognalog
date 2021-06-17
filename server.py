@@ -44,43 +44,42 @@ def is_blocked(x, y, data):
 
 
 def get_cautious_moves(curr_head, data):
-  head_x = curr_head["x"]
-  head_y = curr_head["y"]
-  moves = []
-  if not is_blocked(head_x - 1, head_y, data) and not is_blocked(
-          head_x - 2, head_y, data):
-      moves.append("left")
-  if not is_blocked(head_x + 1, head_y, data) and not is_blocked(
-          head_x + 2, head_y, data):
-      moves.append("right")
-  if not is_blocked(head_x, head_y - 1, data) and not is_blocked(
-          head_x, head_y - 2, data):
-      moves.append("down")
-  if not is_blocked(head_x, head_y + 1, data) and not is_blocked(
-          head_x, head_y + 2, data):
-      moves.append("up")
+    head_x = curr_head["x"]
+    head_y = curr_head["y"]
+    moves = []
+    if not is_blocked(head_x - 1, head_y, data) and not is_blocked(
+            head_x - 2, head_y, data):
+        moves.append("left")
+    if not is_blocked(head_x + 1, head_y, data) and not is_blocked(
+            head_x + 2, head_y, data):
+        moves.append("right")
+    if not is_blocked(head_x, head_y - 1, data) and not is_blocked(
+            head_x, head_y - 2, data):
+        moves.append("down")
+    if not is_blocked(head_x, head_y + 1, data) and not is_blocked(
+            head_x, head_y + 2, data):
+        moves.append("up")
 
-  return moves
+    return moves
 
 
 def get_normal_moves(curr_head, data):
-  head_x = curr_head["x"]
-  head_y = curr_head["y"]
-  moves = []
-  if not is_blocked(head_x - 1, head_y, data):
-      moves.append("left")
-  if not is_blocked(head_x + 1, head_y, data):
-      moves.append("right")
-  if not is_blocked(head_x, head_y - 1, data):
-      moves.append("down")
-  if not is_blocked(head_x, head_y + 1, data):
-      moves.append("up")
+    head_x = curr_head["x"]
+    head_y = curr_head["y"]
+    moves = []
+    if not is_blocked(head_x - 1, head_y, data):
+        moves.append("left")
+    if not is_blocked(head_x + 1, head_y, data):
+        moves.append("right")
+    if not is_blocked(head_x, head_y - 1, data):
+        moves.append("down")
+    if not is_blocked(head_x, head_y + 1, data):
+        moves.append("up")
 
-  return moves
+    return moves
 
 
 def point_distance(p1, p2):
-    print(f"getting dist between {p1} and {p2}")
     return math.sqrt((p1["x"] - p2["x"])**2 + (p1["y"] - p2["y"])**2)
 
 
@@ -99,32 +98,42 @@ def centrality(head, board):
     return (abs(head["x"] - center_x) + abs(head["y"] - center_y)) * -1
 
 
-def move_value(move_str, curr_head, data):
+def apply_move(move_str, curr_head):
     move = move_map[move_str]
     next_head = {
         key: (curr_head[key] + value)
         for (key, value) in move.items()
     }
+    return next_head
+
+
+def board_value(curr_head, data):
     # use any value fns available. This should amount to something like a linear expression
     board = data["board"]
     missing_health = 100 - data["you"]["health"]
     value = (0.1 * missing_health * dist_to_closest_food(
-        next_head, board)) + centrality(next_head, board)
-    print(f"value of move '{move_str}': {value}")
+        curr_head, board)) + centrality(curr_head, board)
 
     return value
 
 
+def board_value_lookahead(curr_head, data, lookahead=0):
+    if lookahead == 0:
+        return board_value(curr_head, data)
+
+    moves = get_normal_moves(curr_head, data)
+    return max({
+        board_value_lookahead(apply_move(move, curr_head), data, lookahead - 1)
+        for move in moves
+    })
+
+
 def choose_move(data):
     curr_head = data["you"]["head"]
-
-    # filter out dangerous moves
-    moves = get_cautious_moves(curr_head, data)
-    if not moves:
-        moves = get_normal_moves(curr_head, data)
-
-    # Choose the best direction to move in
-    return max(moves, key=lambda move: move_value(move, curr_head, data))
+    moves = get_normal_moves(curr_head, data)
+    return max(moves,
+               key=lambda move: board_value_lookahead(
+                   apply_move(move, curr_head), data, 1))
 
 
 class Battlesnake(object):
