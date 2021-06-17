@@ -27,6 +27,8 @@ move_map = {
     }
 }
 
+possible_moves = ["up", "down", "left", "right"]
+
 
 def is_blocked(x, y, data):
     board = data["board"]
@@ -41,36 +43,40 @@ def is_blocked(x, y, data):
     return False
 
 
-def get_cautious_moves(head_x, head_y, data):
-    possible_moves = ["up", "down", "left", "right"]
-    if is_blocked(head_x - 1, head_y, data) or is_blocked(
-            head_x - 2, head_y, data):
-        possible_moves.remove("left")
-    if is_blocked(head_x + 1, head_y, data) or is_blocked(
-            head_x + 2, head_y, data):
-        possible_moves.remove("right")
-    if is_blocked(head_x, head_y - 1, data) or is_blocked(
-            head_x, head_y - 2, data):
-        possible_moves.remove("down")
-    if is_blocked(head_x, head_y + 1, data) or is_blocked(
-            head_x, head_y + 2, data):
-        possible_moves.remove("up")
+def get_cautious_moves(curr_head, data):
+  head_x = curr_head["x"]
+  head_y = curr_head["y"]
+  moves = []
+  if not is_blocked(head_x - 1, head_y, data) and not is_blocked(
+          head_x - 2, head_y, data):
+      moves.append("left")
+  if not is_blocked(head_x + 1, head_y, data) and not is_blocked(
+          head_x + 2, head_y, data):
+      moves.append("right")
+  if not is_blocked(head_x, head_y - 1, data) and not is_blocked(
+          head_x, head_y - 2, data):
+      moves.append("down")
+  if not is_blocked(head_x, head_y + 1, data) and not is_blocked(
+          head_x, head_y + 2, data):
+      moves.append("up")
 
-    return possible_moves
+  return moves
 
 
-def get_normal_moves(head_x, head_y, data):
-    possible_moves = ["up", "down", "left", "right"]
-    if is_blocked(head_x - 1, head_y, data):
-        possible_moves.remove("left")
-    if is_blocked(head_x + 1, head_y, data):
-        possible_moves.remove("right")
-    if is_blocked(head_x, head_y - 1, data):
-        possible_moves.remove("down")
-    if is_blocked(head_x, head_y + 1, data):
-        possible_moves.remove("up")
+def get_normal_moves(curr_head, data):
+  head_x = curr_head["x"]
+  head_y = curr_head["y"]
+  moves = []
+  if not is_blocked(head_x - 1, head_y, data):
+      moves.append("left")
+  if not is_blocked(head_x + 1, head_y, data):
+      moves.append("right")
+  if not is_blocked(head_x, head_y - 1, data):
+      moves.append("down")
+  if not is_blocked(head_x, head_y + 1, data):
+      moves.append("up")
 
-    return possible_moves
+  return moves
 
 
 def point_distance(p1, p2):
@@ -86,15 +92,15 @@ def dist_to_closest_food(head, board):
         closest_dist = min(closest_dist, point_distance(food, head))
     return 0 if closest_dist == default else closest_dist * -1
 
+
 def centrality(head, board):
     center_x = board["width"] / 2
     center_y = board["height"] / 2
     return (abs(head["x"] - center_x) + abs(head["y"] - center_y)) * -1
 
 
-def move_value(move_str, data):
+def move_value(move_str, curr_head, data):
     move = move_map[move_str]
-    curr_head = data["you"]["head"]
     next_head = {
         key: (curr_head[key] + value)
         for (key, value) in move.items()
@@ -107,6 +113,18 @@ def move_value(move_str, data):
     print(f"value of move '{move_str}': {value}")
 
     return value
+
+
+def choose_move(data):
+    curr_head = data["you"]["head"]
+
+    # filter out dangerous moves
+    moves = get_cautious_moves(curr_head, data)
+    if not moves:
+        moves = get_normal_moves(curr_head, data)
+
+    # Choose the best direction to move in
+    return max(moves, key=lambda move: move_value(move, curr_head, data))
 
 
 class Battlesnake(object):
@@ -143,16 +161,8 @@ class Battlesnake(object):
         # TODO: Use the information in cherrypy.request.json to decide your next move.
         data = cherrypy.request.json
 
-        head_x = data["you"]["head"]["x"]
-        head_y = data["you"]["head"]["y"]
-
-        # filter out dangerous moves
-        moves = get_cautious_moves(head_x, head_y, data)
-        if not moves:
-            moves = get_normal_moves(head_x, head_y, data)
-
         # Choose the best direction to move in
-        move = max(moves, key=lambda move: move_value(move, data))
+        move = choose_move(data)
 
         print(f"MOVE: {move}")
         return {"move": move}
