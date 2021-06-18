@@ -8,10 +8,11 @@ This is a simple Battlesnake server written in Python.
 For instructions see https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
 
-lookahead = 3
-coeff_hunger = 0.4
-coeff_centrality = -1
-coeff_avoidance = -1
+lookahead = 5
+coeff_hunger = 0.7
+coeff_centrality = -100
+coeff_avoidance = 0.5
+coeff_hunt = -4
 
 move_map = {
     "up": {
@@ -93,13 +94,27 @@ def dist_to_closest_food(head, board):
     return 0 if closest_dist == default else closest_dist * -1
 
 
-# score fn: distance to closest food
-def dist_to_closest_head(head, data):
+# score fn: distance to closest larger snake head
+def dist_to_closest_pred(head, data):
     default = 10000
     closest_dist = default  # larger than anything realistic
     you = data["you"]
     for snake in data["board"]["snakes"]:
-        if (snake["id"] != you["id"]):
+        if (snake["id"] != you["id"]) and len(snake["body"]) >= len(
+                you["body"]):
+            closest_dist = min(closest_dist,
+                               point_distance(snake["head"], head))
+    return 0 if closest_dist == default else closest_dist
+
+
+# score fn: distance to closest smaller snake head
+def dist_to_closest_prey(head, data):
+    default = 10000
+    closest_dist = default  # larger than anything realistic
+    you = data["you"]
+    for snake in data["board"]["snakes"]:
+        if (snake["id"] != you["id"]) and len(snake["body"]) > len(
+                you["body"]):
             closest_dist = min(closest_dist,
                                point_distance(snake["head"], head))
     return 0 if closest_dist == default else closest_dist
@@ -112,14 +127,24 @@ def centrality(head, board):
 
 
 def board_value(curr_head, data):
-    # use any value fns available. This should amount to something like a linear expression
-    board = data["board"]
-    missing_health = 100 - data["you"]["health"]
-    value = (coeff_hunger * missing_health * dist_to_closest_food(
-        curr_head, board)) + coeff_centrality * centrality(
-            curr_head, board) + coeff_avoidance * dist_to_closest_head(
-                curr_head, data)
-    return value
+  # use any value fns available. This should amount to something like a linear expression
+  board = data["board"]
+
+  # weighted features
+  missing_health = 100 - data["you"]["health"]
+  get_food = (coeff_hunger * missing_health *
+              dist_to_closest_food(curr_head, board))
+  # print(f"get food: {get_food}")
+  stay_center = coeff_centrality * centrality(curr_head, board)
+  # print(f"stay centered: {stay_center}")
+  avoid_pred = coeff_avoidance * dist_to_closest_pred(
+      curr_head, data)
+  # print(f"avoid predators: {avoid_pred}")
+  hunt_prey = coeff_hunt * dist_to_closest_prey(curr_head, data)
+  # print(f"hunt prey: {hunt_prey}")
+
+  value = get_food + stay_center + avoid_pred + hunt_prey
+  return value
 
 
 def apply_move(move_str, curr_head):
@@ -136,7 +161,7 @@ def board_value_lookahead(curr_head, data, lookahead=0):
         return board_value(curr_head, data)
 
     moves = get_safe_moves(curr_head, data)
-    return -10000 if not moves else sum({
+    return -10000 if not moves else max({
         board_value_lookahead(apply_move(move, curr_head), data, lookahead - 1)
         for move in moves
     })
