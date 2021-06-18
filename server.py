@@ -9,6 +9,9 @@ For instructions see https://github.com/BattlesnakeOfficial/starter-snake-python
 """
 
 lookahead = 3
+coeff_hunger = 0.4
+coeff_centrality = -1
+coeff_avoidance = -1
 
 move_map = {
     "up": {
@@ -99,23 +102,23 @@ def dist_to_closest_head(head, data):
         if (snake["id"] != you["id"]):
             closest_dist = min(closest_dist,
                                point_distance(snake["head"], head))
-    return 0 if closest_dist == default else closest_dist * 1
+    return 0 if closest_dist == default else closest_dist
 
 
 def centrality(head, board):
     center_x = board["width"] / 2
     center_y = board["height"] / 2
-    return (abs(head["x"] - center_x) + abs(head["y"] - center_y)) * -1
+    return point_distance(head, {"x": center_x, "y": center_y})
 
 
 def board_value(curr_head, data):
     # use any value fns available. This should amount to something like a linear expression
     board = data["board"]
     missing_health = 100 - data["you"]["health"]
-    value = (missing_health *
-             dist_to_closest_food(curr_head, board)) + 5 * centrality(
-                 curr_head, board) + 3 * dist_to_closest_head(curr_head, data)
-
+    value = (coeff_hunger * missing_health * dist_to_closest_food(
+        curr_head, board)) + coeff_centrality * centrality(
+            curr_head, board) + coeff_avoidance * dist_to_closest_head(
+                curr_head, data)
     return value
 
 
